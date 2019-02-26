@@ -57,15 +57,15 @@ DEFINE_GUIDSTRUCT("5B722BF8-F0AB-47ee-B9C8-8D61D31375A1", PID_MSVAD);
 // Pin properties.
 #define MAX_OUTPUT_STREAMS          0       // Number of capture streams.
 #define MAX_INPUT_STREAMS           1       // Number of render streams.
-#define MAX_TOTAL_STREAMS           MAX_OUTPUT_STREAMS + MAX_INPUT_STREAMS                      
+#define MAX_TOTAL_STREAMS           MAX_OUTPUT_STREAMS + MAX_INPUT_STREAMS
 
 // PCM Info
-#define MIN_CHANNELS                2       // Min Channels.
-#define MAX_CHANNELS_PCM            2       // Max Channels.
-#define MIN_BITS_PER_SAMPLE_PCM     16      // Min Bits Per Sample
-#define MAX_BITS_PER_SAMPLE_PCM     16      // Max Bits Per Sample
-#define MIN_SAMPLE_RATE             44100   // Min Sample Rate
-#define MAX_SAMPLE_RATE             44100   // Max Sample Rate
+#define MIN_CHANNELS                2        // Min Channels.
+#define MAX_CHANNELS_PCM            2        // Max Channels.
+#define MIN_BITS_PER_SAMPLE_PCM     16       // Min Bits Per Sample
+#define MAX_BITS_PER_SAMPLE_PCM     32       // Max Bits Per Sample
+#define MIN_SAMPLE_RATE             44100    // Min Sample Rate
+#define MAX_SAMPLE_RATE             192000   // Max Sample Rate
 
 #define DEV_SPECIFIC_VT_BOOL        9
 #define DEV_SPECIFIC_VT_I4          10
@@ -89,43 +89,27 @@ typedef struct _PHYSICALCONNECTIONTABLE {
 
 // Wave pins
 enum {
-    KSPIN_WAVE_CAPTURE_SINK = 0,
-    KSPIN_WAVE_CAPTURE_SOURCE,
-    KSPIN_WAVE_RENDER_SINK, 
+    KSPIN_WAVE_RENDER_SINK = 0,
     KSPIN_WAVE_RENDER_SOURCE
 };
 
 // Wave Topology nodes.
 enum {
-    KSNODE_WAVE_ADC = 0,
-    KSNODE_WAVE_DAC
+    KSNODE_WAVE_DAC = 0
 };
 
 // topology pins.
 enum {
     KSPIN_TOPO_WAVEOUT_SOURCE = 0,
-    KSPIN_TOPO_SYNTHOUT_SOURCE,
-    KSPIN_TOPO_SYNTHIN_SOURCE,
-    KSPIN_TOPO_MIC_SOURCE,
-    KSPIN_TOPO_LINEOUT_DEST,
-    KSPIN_TOPO_WAVEIN_DEST
+    KSPIN_TOPO_LINEOUT_DEST
 };
 
 // topology nodes.
 enum {
     KSNODE_TOPO_WAVEOUT_VOLUME = 0,
     KSNODE_TOPO_WAVEOUT_MUTE,
-    KSNODE_TOPO_SYNTHOUT_VOLUME,
-    KSNODE_TOPO_SYNTHOUT_MUTE,
-    KSNODE_TOPO_MIC_VOLUME,
-    KSNODE_TOPO_SYNTHIN_VOLUME,
     KSNODE_TOPO_LINEOUT_MIX,
-    KSNODE_TOPO_LINEOUT_VOLUME,
-    KSNODE_TOPO_WAVEIN_MUX,
-
-    KSNODE_TOPO_DEV_SPECIFIC_BOOL, //9
-    KSNODE_TOPO_DEV_SPECIFIC_INT,  //10
-    KSNODE_TOPO_DEV_SPECIFIC_UINT  //11
+    KSNODE_TOPO_LINEOUT_VOLUME
 };
 
 //=============================================================================
@@ -144,5 +128,8 @@ extern NTSTATUS PropertyHandler_Wave(IN PPCPROPERTY_REQUEST PropertyRequest);
 // Default WaveFilter automation table.
 // Handles the GeneralComponentId request.
 extern NTSTATUS PropertyHandler_WaveFilter(IN PPCPROPERTY_REQUEST PropertyRequest);
+
+extern PCHAR g_UnicastIPv4;
+extern DWORD g_UnicastPort;
 
 #endif

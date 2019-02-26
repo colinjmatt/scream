@@ -30,16 +30,140 @@ Abstract:
 NTSTATUS CreateMiniportWaveCyclicMSVAD(OUT PUNKNOWN *, IN  REFCLSID, IN  PUNKNOWN, IN  POOL_TYPE);
 NTSTATUS CreateMiniportTopologyMSVAD(OUT PUNKNOWN *, IN  REFCLSID, IN  PUNKNOWN, IN  POOL_TYPE);
 
+PCHAR g_UnicastIPv4;
+DWORD g_UnicastPort;
+
 //-----------------------------------------------------------------------------
 // Referenced forward.
 //-----------------------------------------------------------------------------
 DRIVER_ADD_DEVICE AddDevice;
 
-NTSTATUS StartDevice(IN PDEVICE_OBJECT, IN PIRP, IN PRESOURCELIST); 
+NTSTATUS StartDevice(IN PDEVICE_OBJECT, IN PIRP, IN PRESOURCELIST);
 
 //-----------------------------------------------------------------------------
 // Functions
 //-----------------------------------------------------------------------------
+
+#pragma code_seg("INIT")
+__drv_requiresIRQL(PASSIVE_LEVEL)
+NTSTATUS
+GetRegistrySettings(
+    _In_ PUNICODE_STRING RegistryPath
+)
+/*++
+
+Routine Description:
+
+    Initialize Driver Framework settings from the driver
+    specific registry settings under
+
+    \REGISTRY\MACHINE\SYSTEM\ControlSetxxx\Services\<driver>\Options
+
+Arguments:
+
+    RegistryPath - Registry path passed to DriverEntry
+
+Returns:
+
+    NTSTATUS - SUCCESS if able to configure the framework
+
+--*/
+
+{
+    NTSTATUS            ntStatus;
+    UNICODE_STRING      parametersPath;
+
+    UNICODE_STRING      unicastIPv4;
+    DWORD               unicastPort = 0;
+
+    RtlZeroMemory(&unicastIPv4, sizeof(UNICODE_STRING));
+
+    RTL_QUERY_REGISTRY_TABLE paramTable[] = {
+        { NULL,   RTL_QUERY_REGISTRY_DIRECT, L"UnicastIPv4", &unicastIPv4, REG_NONE,  NULL, 0 },
+        { NULL,   RTL_QUERY_REGISTRY_DIRECT, L"UnicastPort", &unicastPort, REG_NONE,  NULL, 0 },
+        { NULL,   0,                         NULL,           NULL,         0,         NULL, 0 }
+    };
+
+    DPF(D_TERSE, ("[GetRegistrySettings]"));
+
+    PAGED_CODE();
+
+    RtlInitUnicodeString(&parametersPath, NULL);
+
+    parametersPath.MaximumLength =
+        RegistryPath->Length + sizeof(L"\\Options") + sizeof(WCHAR);
+
+    parametersPath.Buffer = (PWCH)ExAllocatePoolWithTag(NonPagedPool, parametersPath.MaximumLength, MSVAD_POOLTAG);
+    if (parametersPath.Buffer == NULL)
+    {
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    RtlZeroMemory(parametersPath.Buffer, parametersPath.MaximumLength);
+
+    RtlAppendUnicodeToString(&parametersPath, RegistryPath->Buffer);
+    RtlAppendUnicodeToString(&parametersPath, L"\\Options");
+
+    ntStatus = RtlQueryRegistryValues(
+        RTL_REGISTRY_ABSOLUTE | RTL_REGISTRY_OPTIONAL,
+        parametersPath.Buffer,
+        &paramTable[0],
+        NULL,
+        NULL
+    );
+
+    if (!NT_SUCCESS(ntStatus))
+    {
+        DPF(D_VERBOSE, ("RtlQueryRegistryValues failed, using default values, 0x%x", ntStatus));
+        // Don't return error because we will operate with default values.
+    }
+
+    if (unicastPort > 0) {
+        g_UnicastPort = unicastPort;
+    }
+    else {
+        g_UnicastPort = 4010;
+    }
+
+    if ((unicastIPv4.Length > 0) && RtlUnicodeStringToAnsiSize(&unicastIPv4)) {
+        g_UnicastIPv4 = (PCHAR)(ExAllocatePoolWithTag(NonPagedPool, RtlUnicodeStringToAnsiSize(&unicastIPv4) + 1, MSVAD_POOLTAG));
+        if (g_UnicastIPv4) {
+            ANSI_STRING asString;
+            asString.Length = 0;
+            asString.MaximumLength = (USHORT)RtlUnicodeStringToAnsiSize(&unicastIPv4);
+            asString.Buffer = g_UnicastIPv4;
+            ntStatus = RtlUnicodeStringToAnsiString(&asString, &unicastIPv4, false);
+            if (NT_SUCCESS(ntStatus)) {
+                // Halleluja
+                g_UnicastIPv4[asString.Length] = '\0';
+            }
+            else {
+                ExFreePool(g_UnicastIPv4);
+                g_UnicastIPv4 = NULL;
+            }
+        }
+        else {
+            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+        }
+    }
+
+    if (g_UnicastIPv4 == NULL) {
+        g_UnicastIPv4 = (PCHAR)(ExAllocatePoolWithTag(NonPagedPool, 16, MSVAD_POOLTAG));
+        if (g_UnicastIPv4) {
+            RtlCopyMemory(g_UnicastIPv4, "239.255.77.77", 13);
+            g_UnicastIPv4[13] = '\0';
+        }
+        else {
+            ntStatus = STATUS_INSUFFICIENT_RESOURCES;
+        }
+    }
+
+    ExFreePool(parametersPath.Buffer);
+
+    return STATUS_SUCCESS;
+}
+
+
 
 //=============================================================================
 #pragma code_seg("INIT")
@@ -69,6 +193,8 @@ Return Value:
     NTSTATUS ntStatus;
 
     DPF(D_TERSE, ("[DriverEntry]"));
+
+    GetRegistrySettings(RegistryPathName);
 
     // Tell the class driver to initialize the driver.
     ntStatus = PcInitializeAdapterDriver(DriverObject, RegistryPathName, (PDRIVER_ADD_DEVICE)AddDevice);
